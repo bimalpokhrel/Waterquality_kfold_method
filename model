@@ -1,0 +1,65 @@
+install.packages("caret")
+library(caret)
+data=read.table(file="clipboard",sep='\t',header=TRUE)
+data
+#run below all code multiple time to suffle data so as to get best average RMSE 
+# Separating the features and target variable
+X <- data[, -ncol(data)]
+y <- data[, ncol(data)]
+
+#number of folds for cross-validation
+k <- 3
+
+#container to store the evaluation metric scores
+evaluation_scores <- numeric(k)
+
+# Creating a container to store the coefficients of the best model
+best_model_coefficients <- NULL
+# Performing k-fold cross-validation
+folds <- createFolds(y, k = k, list = TRUE, returnTrain = TRUE)
+
+for (i in 1:k) {
+  # Getting the training and testing data for this fold
+  
+  train_indices <- unlist(folds[i])
+  test_indices <- setdiff(seq_len(nrow(data)), train_indices)
+  X_train <- X[train_indices, ]
+  y_train <- y[train_indices]
+  X_test <- X[test_indices, ]
+  y_test <- y[test_indices]
+  
+  # Training regression model using the training data
+  model <- lm(y_train ~ ., data = X_train)
+  
+  # Making predictions on the test set
+  predictions <- predict(model, newdata = X_test)
+  
+  # Calculating the evaluation metric for this fold
+  evaluation_score <- RMSE(y_test, predictions)
+  
+  # Storing the evaluation score
+  evaluation_scores[i] <- evaluation_score
+  
+  # Check if this model has the highest evaluation score so far
+  if (i == which.min(evaluation_scores)) {
+    # Store the coefficients of the best model
+    best_model_coefficients <- model
+    
+    
+  }
+}
+
+# Print the coefficients of the best model
+print(best_model_coefficients)
+
+
+# Calculate the average evaluation score across all folds
+average_evaluation_score <- mean(evaluation_scores)
+
+# Print the average evaluation score
+print(paste("Average Evaluation Score:", average_evaluation_score))
+
+
+best_model <- which.min(evaluation_scores)
+print(paste("Best Model:", best_model))
+
