@@ -1,0 +1,84 @@
+import rasterio
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+
+# Function to convert decimal degrees to DM format
+def decimal_degrees_to_dm(decimal_degrees):
+    degrees = int(decimal_degrees)
+    decimal_minutes = (decimal_degrees - degrees) * 60
+    return degrees, decimal_minutes
+
+# Load the four raster data using rasterio
+file_paths = [
+    "C:\\bimal_pkrl\\waterquality_map\\final_images\\Do_phw_1r.tif",
+    "C:\\bimal_pkrl\\waterquality_map\\final_images\\begnas1_do.tif",
+    "C:\\bimal_pkrl\\waterquality_map\\final_images\\begnas_2_dor.tif",
+    "C:\\Users\\Bimal pokhrel\\Desktop\\mapping water\\water_quality_work_space\\DO1_phewa2r.tif"
+]
+
+# Create a custom colormap combining a legend
+colors = [(0, 0, 0), (0, 0, 0.5), (0, 1, 0), (1, 1, 0), (1, 0, 0)]
+cmap = LinearSegmentedColormap.from_list('elevation_colormap', colors, N=256)
+
+# Create a 2x2 grid of subplots
+fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+
+for i, ax in enumerate(axes.flatten()):
+    with rasterio.open(file_paths[i]) as dataset:
+        dem_data = dataset.read(1).astype(float)
+
+        # Filter out values higher than 4 
+        dem_data[dem_data < 4] = np.nan
+
+        im = ax.imshow(dem_data, cmap=cmap, extent=dataset.bounds, origin='upper', vmin=0, vmax=10)
+        
+        # Get coordinates of the corners
+        top = dataset.bounds.top
+        left = dataset.bounds.left
+        
+        # Convert decimal degrees to DM format for labeling
+        left_deg, left_min = decimal_degrees_to_dm(left)
+        top_deg, top_min = decimal_degrees_to_dm(top)
+        
+        # Set title manually
+        titles = [
+            "Phewa November,2022",
+            "Begnas December,2022",
+            "Begnas January,2023",
+            "Phewa March,2023"
+        ]
+        ax.set_title(titles[i], fontweight='bold')
+        
+        # Set x-axis tick positions and labels to display corner coordinates in DM format with reduced font size
+        xtick_labels = [f'{left_deg}° {left_min:.2f}\' W']
+        ax.set_xticks([left])
+        ax.set_xticklabels(xtick_labels, rotation=0, ha='left', fontsize=8)
+        
+        # Set y-axis tick positions and labels to display corner coordinates in DM format with reduced font size
+        ytick_labels = [f'{top_deg}° {top_min:.2f}\' N']
+        ax.set_yticks([top])
+        ax.set_yticklabels(ytick_labels, rotation=90, ha='right', fontsize=8)
+        
+        # Set x-axis label parallel to the axis
+        ax.set_xlabel('Longitude')
+        
+        # Set y-axis label parallel to the axis
+        ax.set_ylabel('Latitude')
+
+        # Set axis line width to bold
+        ax.spines['top'].set_linewidth(2)
+        ax.spines['bottom'].set_linewidth(2)
+        ax.spines['left'].set_linewidth(2)
+        ax.spines['right'].set_linewidth(2)
+
+# Add a single colorbar for all subplots
+cax = fig.add_axes([0.95, 0.15, 0.02, 0.7])
+cbar = plt.colorbar(im, cax=cax)
+cbar.set_label('DO (ppm)', fontweight='bold')
+
+# Adjust subplot layout
+plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.4, hspace=0.4)
+
+# Show the plot
+plt.show()
