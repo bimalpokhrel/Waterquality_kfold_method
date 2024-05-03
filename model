@@ -1,26 +1,28 @@
+#Linear regression
+# Load required library
 install.packages("caret")
 library(caret)
-data=read.table(file="clipboard",sep='\t',header=TRUE)
-data
-#run below all code multiple time to suffle data so as to get best average RMSE 
-# Separating the features and target variable
-X <- data[, -ncol(data)]
-y <- data[, ncol(data)]
 
-#number of folds for cross-validation
+# Load data from clipboard
+data <- read.table(file="clipboard", sep='\t', header=TRUE)
+data
+# Separating the features and target variable
+X <- data[, 1:3]
+y <- data[, 4]
+
 k <- 3
 
-#container to store the evaluation metric scores
-evaluation_scores <- numeric(k)
+# Creating a container to store the evaluation metric scores
+evaluation_metrics <- data.frame(RMSE = numeric(k), MAE = numeric(k), MSE = numeric(k), R_squared = numeric(k))
 
-# Creating a container to store the coefficients of the best model
-best_model_coefficients <- NULL
 # Performing k-fold cross-validation
 folds <- createFolds(y, k = k, list = TRUE, returnTrain = TRUE)
 
+# Container for storing trained model objects
+svm_models <- list()
+
 for (i in 1:k) {
   # Getting the training and testing data for this fold
-  
   train_indices <- unlist(folds[i])
   test_indices <- setdiff(seq_len(nrow(data)), train_indices)
   X_train <- X[train_indices, ]
@@ -28,38 +30,328 @@ for (i in 1:k) {
   X_test <- X[test_indices, ]
   y_test <- y[test_indices]
   
-  # Training regression model using the training data
-  model <- lm(y_train ~ ., data = X_train)
+  # Training SVM model using the training data
+  model <- train(x = X_train, y = y_train, method = "svmLinear")
+  
+  # Store the trained model object
+  svm_models[[i]] <- model$finalModel
   
   # Making predictions on the test set
   predictions <- predict(model, newdata = X_test)
   
-  # Calculating the evaluation metric for this fold
-  evaluation_score <- RMSE(y_test, predictions)
+  # Calculating evaluation metrics for this fold
+  evaluation_metrics[i, "RMSE"] <- sqrt(mean((predictions - y_test)^2))
+  evaluation_metrics[i, "MAE"] <- mean(abs(predictions - y_test))
+  evaluation_metrics[i, "MSE"] <- mean((predictions - y_test)^2)
+  evaluation_metrics[i, "R_squared"] <- cor(predictions, y_test)^2
   
-  # Storing the evaluation score
-  evaluation_scores[i] <- evaluation_score
-  
-  # Check if this model has the highest evaluation score so far
-  if (i == which.min(evaluation_scores)) {
-    # Store the coefficients of the best model
-    best_model_coefficients <- model
-    
-    
-  }
+  # Print model details
+  print(paste("Fold", i, "Model Details:"))
+  print(summary(model$finalModel))
 }
 
-# Print the coefficients of the best model
-print(best_model_coefficients)
+# Print the evaluation metrics
+print("Evaluation Metrics:")
+print(evaluation_metrics)
+
+# Calculate the average evaluation scores across all folds
+average_evaluation_scores <- colMeans(evaluation_metrics)
+print("Average Evaluation Scores:")
+print(average_evaluation_scores)
+
+# Print out the trained SVM models for each fold
+for (i in 1:k) {
+  cat("Fold", i, "SVM Model:\n")
+  print(svm_models[[i]])
+}
 
 
-# Calculate the average evaluation score across all folds
-average_evaluation_score <- mean(evaluation_scores)
 
-# Print the average evaluation score
-print(paste("Average Evaluation Score:", average_evaluation_score))
+#RIDGE REGRESSION
+# Load required library
+install.packages("caret")
+install.packages("glmnet")
+library(caret)
+library(glmnet)
+
+# Load data from clipboard
+data <- read.table(file = "clipboard", sep = '\t', header = TRUE)
+data
 
 
-best_model <- which.min(evaluation_scores)
-print(paste("Best Model:", best_model))
+# Separating the features and target variable
+X <- data[, 1:3]
+y <- data[, 4]
 
+# Setting the number of folds for cross-validation
+k <- 3
+model_coefficients <- list()
+
+# Creating a container to store the evaluation metric scores
+evaluation_metrics <- data.frame(RMSE = numeric(k), MAE = numeric(k), MSE = numeric(k), R_squared = numeric(k))
+
+# Performing k-fold cross-validation
+folds <- createFolds(y, k = k, list = TRUE, returnTrain = TRUE)
+
+for (i in 1:k) {
+  # Getting the training and testing data for this fold
+  train_indices <- unlist(folds[i])
+  test_indices <- setdiff(seq_len(nrow(data)), train_indices)
+  X_train <- X[train_indices, ]
+  y_train <- y[train_indices]
+  X_test <- X[test_indices, ]
+  y_test <- y[test_indices]
+  
+  # Train Ridge Regression model using the training data
+  ridge_model <- cv.glmnet(as.matrix(X_train), y_train, alpha = 0)  # alpha = 0 for Ridge Regression
+  
+  # Making predictions on the test set
+  predictions <- predict(ridge_model, newx = as.matrix(X_test), s = "lambda.min")
+  
+  # Calculating evaluation metrics for this fold
+  evaluation_metrics[i, "RMSE"] <- sqrt(mean((predictions - y_test)^2))
+  evaluation_metrics[i, "MAE"] <- mean(abs(predictions - y_test))
+  evaluation_metrics[i, "MSE"] <- mean((predictions - y_test)^2)
+  evaluation_metrics[i, "R_squared"] <- cor(predictions, y_test)^2
+  
+  # Storing the model coefficients
+  model_coefficients[[i]] <- coef(ridge_model, s = "lambda.min")
+}
+
+# Print the evaluation metrics
+print("Evaluation Metrics:")
+print(evaluation_metrics)
+
+# Calculate the average evaluation scores across all folds
+average_evaluation_scores <- colMeans(evaluation_metrics)
+print("Average Evaluation Scores:")
+print(average_evaluation_scores)
+
+# Print out the model coefficients for each fold
+for (i in 1:k) {
+  cat("Fold", i, "Model Coefficients:\n")
+  print(model_coefficients[[i]])
+}
+
+
+
+
+#LASSO REGRESSION 
+install.packages("caret")
+install.packages("glmnet")
+library(caret)
+library(glmnet)
+
+# Load data from clipboard
+data <- read.table(file = "clipboard", sep = '\t', header = TRUE)
+
+
+# Separating the features and target variable
+X <- data[, 1:3]
+y <- data[, 4]
+
+# Setting the number of folds for cross-validation
+k <- 3
+model_coefficients <- list()
+
+# Creating a container to store the evaluation metric scores
+evaluation_metrics <- data.frame(RMSE = numeric(k), MAE = numeric(k), MSE = numeric(k), R_squared = numeric(k))
+
+# Performing k-fold cross-validation
+folds <- createFolds(y, k = k, list = TRUE, returnTrain = TRUE)
+
+for (i in 1:k) {
+  # Getting the training and testing data for this fold
+  train_indices <- unlist(folds[i])
+  test_indices <- setdiff(seq_len(nrow(data)), train_indices)
+  X_train <- X[train_indices, ]
+  y_train <- y[train_indices]
+  X_test <- X[test_indices, ]
+  y_test <- y[test_indices]
+  
+  # Training Lasso Regression model using the training data
+  model <- glmnet(X_train, y_train, alpha = 1)  # Setting alpha to 1 for Lasso Regression
+  
+  # Making predictions on the test set
+  predictions <- predict(model, newx = as.matrix(X_test))
+  
+  # Calculating evaluation metrics for this fold
+  evaluation_metrics[i, "RMSE"] <- sqrt(mean((predictions - y_test)^2))
+  evaluation_metrics[i, "MAE"] <- mean(abs(predictions - y_test))
+  evaluation_metrics[i, "MSE"] <- mean((predictions - y_test)^2)
+  
+  # Calculating R-squared
+  RSS <- sum((y_test - predictions)^2)
+  TSS <- sum((y_test - mean(y_test))^2)
+  evaluation_metrics[i, "R_squared"] <- 1 - (RSS / TSS)
+  
+  # Extracting non-zero coefficients for Lasso model
+  nonzero_coeffs <- coef(model)[,1]  # Extracting coefficients for the first lambda value
+  model_coefficients[[i]] <- nonzero_coeffs[nonzero_coeffs != 0]  # Filter out non-zero coefficients
+  
+}
+
+# Print the evaluation metrics
+print("Evaluation Metrics:")
+print(evaluation_metrics)
+
+# Calculate the average evaluation scores across all folds
+average_evaluation_scores <- colMeans(evaluation_metrics)
+print("Average Evaluation Scores:")
+print(average_evaluation_scores)
+
+# Print out the model coefficients for each fold
+for (i in 1:k) {
+  cat("Fold", i, "Model Coefficients:\n")
+  print(model_coefficients[[i]])
+}
+
+
+
+#RANDOM FOREST 
+# Load required library
+install.packages("caret")
+library(caret)
+
+# Load data from clipboard
+data <- read.table(file="clipboard", sep='\t', header=TRUE)
+data
+
+# Separating the features and target variable
+X <- data[, 1:3]
+y <- data[, 4]
+
+# Setting the number of folds for cross-validation
+k <- 3
+model_coefficients <- list()
+
+# Creating a container to store the evaluation metric scores
+evaluation_metrics <- data.frame(RMSE = numeric(k), MAE = numeric(k), MSE = numeric(k), R_squared = numeric(k))
+
+# Performing k-fold cross-validation
+folds <- createFolds(y, k = k, list = TRUE, returnTrain = TRUE)
+
+for (i in 1:k) {
+  # Getting the training and testing data for this fold
+  train_indices <- unlist(folds[i])
+  test_indices <- setdiff(seq_len(nrow(data)), train_indices)
+  X_train <- X[train_indices, ]
+  y_train <- y[train_indices]
+  X_test <- X[test_indices, ]
+  y_test <- y[test_indices]
+  
+  # Training Random Forest model using the training data
+  model <- train(x = X_train, y = y_train, method = "rf")
+  
+  # Making predictions on the test set
+  predictions <- predict(model, newdata = X_test)
+  
+  # Calculating evaluation metrics for this fold
+  evaluation_metrics[i, "RMSE"] <- sqrt(mean((predictions - y_test)^2))
+  evaluation_metrics[i, "MAE"] <- mean(abs(predictions - y_test))
+  evaluation_metrics[i, "MSE"] <- mean((predictions - y_test)^2)
+  evaluation_metrics[i, "R_squared"] <- cor(predictions, y_test)^2
+  
+  # Storing the model coefficients
+  model_coefficients[[i]] <- model$finalModel
+  
+}
+
+# Print the evaluation metrics
+print("Evaluation Metrics:")
+print(evaluation_metrics)
+
+# Calculate the average evaluation scores across all folds
+average_evaluation_scores <- colMeans(evaluation_metrics)
+print("Average Evaluation Scores:")
+print(average_evaluation_scores)
+for (i in 1:k) {
+  cat("Fold", i, "Model Coefficients:\n")
+  print(model_coefficients[[i]])
+}
+
+# Calculate variable importance
+variable_importance <- varImp(model)
+print("Variable Importance:")
+print(variable_importance)
+
+# Print out the model coefficients for each fold
+for (i in 1:k) {
+  cat("Fold", i, "Model Coefficients:\n")
+  print(model_coefficients[[i]])
+}
+# Print the evaluation metrics
+print("Evaluation Metrics:")
+print(evaluation_metrics)
+
+
+
+
+#SVM METHOD
+
+
+# Load required library
+install.packages("caret")
+library(caret)
+
+# Load data from clipboard
+data <- read.table(file="clipboard", sep='\t', header=TRUE)
+data
+# Separating the features and target variable
+X <- data[, 1:3]
+y <- data[, 4]
+
+k <- 3
+
+# Creating a container to store the evaluation metric scores
+evaluation_metrics <- data.frame(RMSE = numeric(k), MAE = numeric(k), MSE = numeric(k), R_squared = numeric(k))
+
+# Performing k-fold cross-validation
+folds <- createFolds(y, k = k, list = TRUE, returnTrain = TRUE)
+
+# Container for storing trained model objects
+svm_models <- list()
+
+for (i in 1:k) {
+  # Getting the training and testing data for this fold
+  train_indices <- unlist(folds[i])
+  test_indices <- setdiff(seq_len(nrow(data)), train_indices)
+  X_train <- X[train_indices, ]
+  y_train <- y[train_indices]
+  X_test <- X[test_indices, ]
+  y_test <- y[test_indices]
+  
+  # Training SVM model using the training data
+  model <- train(x = X_train, y = y_train, method = "svmLinear")
+  
+  # Store the trained model object
+  svm_models[[i]] <- model$finalModel
+  
+  # Making predictions on the test set
+  predictions <- predict(model, newdata = X_test)
+  
+  # Calculating evaluation metrics for this fold
+  evaluation_metrics[i, "RMSE"] <- sqrt(mean((predictions - y_test)^2))
+  evaluation_metrics[i, "MAE"] <- mean(abs(predictions - y_test))
+  evaluation_metrics[i, "MSE"] <- mean((predictions - y_test)^2)
+  evaluation_metrics[i, "R_squared"] <- cor(predictions, y_test)^2
+  
+  # Print model details
+  print(paste("Fold", i, "Model Details:"))
+  print(summary(model$finalModel))
+}
+
+# Print the evaluation metrics
+print("Evaluation Metrics:")
+print(evaluation_metrics)
+
+# Calculate the average evaluation scores across all folds
+average_evaluation_scores <- colMeans(evaluation_metrics)
+print("Average Evaluation Scores:")
+print(average_evaluation_scores)
+
+# Print out the trained SVM models for each fold
+for (i in 1:k) {
+  cat("Fold", i, "SVM Model:\n")
+  print(svm_models[[i]])
+}
